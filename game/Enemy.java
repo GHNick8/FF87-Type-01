@@ -1,9 +1,21 @@
 package game;
 
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import javax.imageio.ImageIO;
+
 public class Enemy {
-    String name = "Slime";
-    int maxHP = 20;
-    int currentHP = maxHP;
+    public String name = "Spider";
+    public int maxHP = 25;
+    public int currentHP = maxHP;
+
+    public BufferedImage sprite;
+
+    public Enemy() {
+        try {
+            sprite = ImageIO.read(getClass().getResourceAsStream("/assets/enemies/spiders/spider01.png"));
+        } catch (IOException e) {}
+    }
 
     public void takeDamage(int damage) {
         currentHP -= damage;

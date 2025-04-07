@@ -4,6 +4,9 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 import javax.swing.plaf.DimensionUIResource;
 
@@ -25,6 +28,8 @@ public class GamePanel extends JPanel implements Runnable{
     // Game elements
     TileMap tileMap = new TileMap();
     Player player = new Player(tileSize, tileSize, tileMap);
+    BufferedImage playerSprite;
+
 
     // Battle UI
     String[] battleMenu = { "Fight", "Magic", "Run" };
@@ -46,6 +51,10 @@ public class GamePanel extends JPanel implements Runnable{
         this.setDoubleBuffered(true);
         this.addKeyListener(new InputHandler());
         this.setFocusable(true);
+
+        try {
+            playerSprite = ImageIO.read(getClass().getResourceAsStream("/assets/player/dark_soldier-dragonrider.png"));
+        } catch (IOException e) {}
     }
 
     public void startGameThread() {
@@ -188,22 +197,38 @@ public class GamePanel extends JPanel implements Runnable{
             g2.setFont(new Font("Arial", Font.BOLD, 28));
             g2.drawString("BATTLE!", 150, 40);
 
-            // Enemy info
-            g2.setFont(new Font("Arial", Font.PLAIN, 20));
-            g2.drawString("Enemy: " + enemy.name, 50, 80);
-            g2.drawString("HP: " + enemy.currentHP + "/" + enemy.maxHP, 50, 100);
+            // Draw enemy sprite
+            if (enemy.sprite != null) {
+                int spriteSize = 64;
+                int col = 0; 
+                int row = 2; 
+                BufferedImage enemyFrame = enemy.sprite.getSubimage(col * spriteSize, row * spriteSize, spriteSize, spriteSize); 
+                g2.drawImage(enemyFrame, 250, 60, 128, 128, null);
+
+            }
+
+            // Draw player sprite 
+            if (playerSprite != null) {
+                int frameWidth = 48;
+                int frameHeight = 64;
+                int col = 1; 
+                int row = 0; 
+                BufferedImage playerFrame = playerSprite.getSubimage(col * frameWidth, row * frameHeight, frameWidth, frameHeight);
+
+                g2.drawImage(playerFrame, 80, 250, frameWidth * 2, frameHeight * 2, null); 
+            }
 
             // Player HP
-            g2.drawString("Player HP: " + playerHP, 250, 100);
+            g2.drawString("Player HP: " + playerHP, 50, 100);
 
-            // Menu
+            // Battle menu 
             for (int i = 0; i < battleMenu.length; i++) {
                 if (i == selectedOption) {
                     g2.setColor(Color.YELLOW);
-                    g2.drawString("> " + battleMenu[i], 50, 180 + i * 30);
+                    g2.drawString("> " + battleMenu[i], 100, 180 + i * 30);
                 } else {
                     g2.setColor(Color.WHITE);
-                    g2.drawString(battleMenu[i], 50, 180 + i * 30);
+                    g2.drawString(battleMenu[i], 100, 180 + i * 30);
                 }
             }
 
