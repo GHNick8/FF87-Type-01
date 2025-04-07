@@ -1,6 +1,7 @@
 package game;
 
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import javax.swing.JPanel;
@@ -14,13 +15,30 @@ public class GamePanel extends JPanel implements Runnable{
     final int screenWidth = tileSize * maxScreenCol;
     final int screenHeight = tileSize * maxScreenRow;
 
+    long lastBattleTime = 0;
+    final long battleCooldown = 1000; 
+
     // Game loop
     Thread gameThread;
     final int FPS = 60;
 
     // Game elements
-    Player player = new Player(tileSize, tileSize);
     TileMap tileMap = new TileMap();
+    Player player = new Player(tileSize, tileSize, tileMap);
+
+    // Battle UI
+    String[] battleMenu = { "Fight", "Magic", "Run" };
+    int selectedOption = 0;
+
+    // Enemy UI
+    Enemy enemy = new Enemy();
+    int playerHP = 30;
+    boolean playerTurn = true;
+    String battleMessage = "";
+    boolean inAction = false;
+
+    // Game state
+    GameState gameState = GameState.OVERWORLD;
 
     public GamePanel() {
         this.setPreferredSize(new DimensionUIResource(screenWidth, screenHeight));
@@ -34,6 +52,12 @@ public class GamePanel extends JPanel implements Runnable{
         gameThread = new Thread(this);
         gameThread.start();
     }
+
+    private void sleep(int ms) {
+        try { 
+            Thread.sleep(ms); 
+        } catch (InterruptedException e) {}
+    }    
 
     @Override
     public void run() {
@@ -55,7 +79,97 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void update() {
-        player.update();
+        if (gameState == GameState.OVERWORLD) {
+            player.update();
+        
+            int currentTileX = player.getTileX();
+            int currentTileY = player.getTileY();
+        
+            // Check for encounter if player changed tile
+            if (player.lastTileX != currentTileX || player.lastTileY != currentTileY) {
+                player.lastTileX = currentTileX;
+                player.lastTileY = currentTileY;
+        
+                int tileIndex = tileMap.getTileIndexAt(player.getCenterX(), player.getCenterY());
+        
+                if (tileMap.isBattleZone(tileIndex)) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastBattleTime > battleCooldown) {
+                        // 10% chance
+                        if (Math.random() < 0.10) { 
+                            lastBattleTime = now;
+                            gameState = GameState.BATTLE;
+                            battleMessage = "";
+                            enemy = new Enemy();
+                            selectedOption = 0;
+                            playerTurn = true;
+                            inAction = false;
+                            System.out.println("Random battle triggered!");
+                        }
+                    }
+                }
+            }
+        }        
+
+        if (gameState == GameState.BATTLE) {
+            if (!inAction && playerTurn) {
+                if (InputHandler.isKeyDown(java.awt.event.KeyEvent.VK_UP)) {
+                    selectedOption = (selectedOption - 1 + battleMenu.length) % battleMenu.length;
+                    sleep(150);
+                }
+                if (InputHandler.isKeyDown(java.awt.event.KeyEvent.VK_DOWN)) {
+                    selectedOption = (selectedOption + 1) % battleMenu.length;
+                    sleep(150);
+                }
+                if (InputHandler.isKeyDown(java.awt.event.KeyEvent.VK_Z)) {
+                    if (battleMenu[selectedOption].equals("Fight")) {
+                        int damage = (int)(Math.random() * 6 + 5); 
+                        enemy.takeDamage(damage);
+                        battleMessage = "You hit " + enemy.name + " for " + damage + "!";
+                        inAction = true;
+                        sleep(500);
+                    } else if (battleMenu[selectedOption].equals("Run")) {
+                        gameState = GameState.OVERWORLD;
+                        battleMessage = "";
+                        enemy = new Enemy(); 
+                        playerHP = 30;
+                        selectedOption = 0;
+                        return;
+                    }
+                }
+            }
+            
+            // Enemy turn after action
+            if (inAction && !enemy.isDefeated()) {
+                sleep(1000);
+                int enemyDamage = (int)(Math.random() * 4 + 3); 
+                playerHP -= enemyDamage;
+                battleMessage += "\n" + enemy.name + " hits you for " + enemyDamage + "!";
+                inAction = false;
+                playerTurn = true;
+            }
+            
+            // End battle
+            if (enemy.isDefeated()) {
+                battleMessage = "You defeated the " + enemy.name + "!";
+                if (InputHandler.isKeyDown(java.awt.event.KeyEvent.VK_Z)) {
+                    gameState = GameState.OVERWORLD;
+                    enemy = new Enemy();
+                    playerHP = 30;
+                    selectedOption = 0;
+                    battleMessage = "";
+                }
+            } else if (playerHP <= 0) {
+                battleMessage = "You were defeated...";
+                if (InputHandler.isKeyDown(java.awt.event.KeyEvent.VK_Z)) {
+                    gameState = GameState.OVERWORLD;
+                    enemy = new Enemy();
+                    playerHP = 30;
+                    selectedOption = 0;
+                    battleMessage = "";
+                }
+            }            
+        }        
     }
 
     @Override
@@ -63,8 +177,46 @@ public class GamePanel extends JPanel implements Runnable{
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
-        tileMap.draw(g2);
-        player.draw(g2);
+        if (gameState == GameState.OVERWORLD) {
+            tileMap.draw(g2);
+            player.draw(g2);
+        } else if (gameState == GameState.BATTLE) {
+            g2.setColor(Color.black);
+            g2.fillRect(0, 0, getWidth(), getHeight());
+
+            g2.setColor(Color.white);
+            g2.setFont(new Font("Arial", Font.BOLD, 28));
+            g2.drawString("BATTLE!", 150, 40);
+
+            // Enemy info
+            g2.setFont(new Font("Arial", Font.PLAIN, 20));
+            g2.drawString("Enemy: " + enemy.name, 50, 80);
+            g2.drawString("HP: " + enemy.currentHP + "/" + enemy.maxHP, 50, 100);
+
+            // Player HP
+            g2.drawString("Player HP: " + playerHP, 250, 100);
+
+            // Menu
+            for (int i = 0; i < battleMenu.length; i++) {
+                if (i == selectedOption) {
+                    g2.setColor(Color.YELLOW);
+                    g2.drawString("> " + battleMenu[i], 50, 180 + i * 30);
+                } else {
+                    g2.setColor(Color.WHITE);
+                    g2.drawString(battleMenu[i], 50, 180 + i * 30);
+                }
+            }
+
+            // Battle message
+            g2.setColor(Color.CYAN);
+            g2.setFont(new Font("Arial", Font.PLAIN, 16));
+
+            String[] lines = battleMessage.split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                g2.drawString(lines[i], 50, 300 + i * 20);
+            }
+        }
+
         g2.dispose();
     }
 }

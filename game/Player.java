@@ -6,15 +6,18 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
-public class Player {
+public final class Player {
     int x, y, speed = 4;
-    // final int tileSize = 64;
     final int frameWidth = 48;
     final int frameHeight = 64;
+    int lastTileX = -1;
+    int lastTileY = -1;
     BufferedImage spriteSheet;
     BufferedImage currentFrame;
     int frame = 0;
     int frameCounter = 0;
+
+    TileMap tileMap;
 
     enum Direction {
         DOWN, LEFT, RIGHT, UP
@@ -22,11 +25,32 @@ public class Player {
 
     Direction direction = Direction.DOWN;
 
-    public Player(int x, int y) {
+    public int getCenterX() {
+        return x + frameWidth / 2;
+    }
+    
+    public int getCenterY() {
+        return y + frameHeight / 2;
+    }    
+
+    public int getTileX() {
+        return (x + frameWidth / 2) / tileMap.tileSize;
+    }
+    
+    public int getTileY() {
+        return (y + frameHeight / 2) / tileMap.tileSize;
+    }
+
+    public Player(int x, int y, TileMap tileMap) {
         this.x = x;
         this.y = y;
         // this.tileSize = 32;
+        this.tileMap = tileMap;
         loadSprites();
+
+        // Initialize last tile based on starting position
+        this.lastTileX = getTileX();
+        this.lastTileY = getTileY();
     }
 
     public void loadSprites() {
@@ -35,40 +59,48 @@ public class Player {
             // DEBUG sprite 
             // spriteSheet = ImageIO.read(new File("/assets/player/dark_soldier-dragonrider.png"));
             currentFrame = spriteSheet.getSubimage(0, 0, frameWidth, frameHeight);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        } catch (IOException e) {}
     }
 
     public void update() {
         boolean moved = false;
+        
+        int nextX = x;
+        int nextY = y;
 
         if (InputHandler.isKeyDown(KeyEvent.VK_LEFT)) {
-            x -= speed;
+            nextX -= speed;
             direction = Direction.LEFT;
             moved = true;
         }
 
         if (InputHandler.isKeyDown(KeyEvent.VK_RIGHT)) {
-            x += speed;
+            nextX += speed;
             direction = Direction.RIGHT;
             moved = true;
         }
         if (InputHandler.isKeyDown(KeyEvent.VK_UP)) {
-            y -= speed;
+            nextY -= speed;
             direction = Direction.UP;
             moved = true;
         }
         if (InputHandler.isKeyDown(KeyEvent.VK_DOWN)) {
-            y += speed;
+            nextY += speed;
             direction = Direction.DOWN;
             moved = true;
         }
 
         if (moved) {
-            animate();
+            int centerX = nextX + frameWidth / 2;
+            int centerY = nextY + frameHeight / 2;
+    
+            if (!tileMap.isTileBlocked(centerX, centerY)) {
+                x = nextX;
+                y = nextY;
+            }
+    
+            animate(); 
         } else {
-            // Idle pose 
             frame = 0; 
         }
     }
